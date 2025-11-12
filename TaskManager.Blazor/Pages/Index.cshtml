@@ -1,0 +1,34 @@
+﻿@page "/"
+@using TaskManager.Blazor.Services
+@inject ITaskService TaskService
+
+<PageTitle>Gestor de Tareas</PageTitle>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="text-center mb-4">📋 Gestor Personal de Tareas</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12 col-lg-4 mb-4">
+            <TaskForm OnTaskCreated="HandleTaskCreated" />
+        </div>
+        <div class="col-12 col-lg-8">
+            <TaskList @ref ="taskListRef" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private TaskList? taskListRef;
+
+    private async Task HandleTaskCreated()
+    {
+        if (taskListRef != null)
+        {
+            await taskListRef.RefreshTasks();
+        }
+    }
+}

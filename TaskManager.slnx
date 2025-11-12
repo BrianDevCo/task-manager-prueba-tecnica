@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="TaskManager.Blazor/TaskManager.Blazor.csproj" />
+  <Project Path="TaskManager.Core/TaskManager.Core.csproj" />
+  <Project Path="TaskManager.Tests/TaskManager.Tests.csproj" />
+  <Project Path="TaskManager/TaskManager.Api.csproj" />
+</Solution>

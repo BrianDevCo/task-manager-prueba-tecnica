@@ -1,0 +1,123 @@
+﻿@using TaskManager.Core.DTOs
+@using System.ComponentModel.DataAnnotations
+@inject ITaskService TaskService
+@inject ILogger<TaskForm> Logger
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h4>Nueva Tarea</h4>
+    </div>
+    <div class="card-body">
+        <EditForm Model="@NewTask" OnValidSubmit="@HandleSubmit">
+            <DataAnnotationsValidator />
+            
+            <div class="mb-3">
+                <label for="title" class="form-label">Título *</label>
+                <InputText id="title" class="form-control @(IsTitleInvalid ? "is-invalid" : "")" 
+                           @bind-Value="NewTask.Title" />
+                <ValidationMessage For="@(() => NewTask.Title)" />
+                @if (IsTitleInvalid)
+                {
+                    <div class="invalid-feedback">
+                        El título es obligatorio y debe tener entre 1 y 200 caracteres.
+                    </div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label for="description" class="form-label">Descripción</label>
+                <InputTextArea id="description" class="form-control" 
+                               @bind-Value="NewTask.Description" rows="3" />
+                <ValidationMessage For="@(() => NewTask.Description)" />
+            </div>
+
+            <button type="submit" class="btn btn-primary" disabled="@IsSubmitting">
+                @if (IsSubmitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Agregar Tarea
+            </button>
+        </EditForm>
+
+        @if (SuccessMessage != null)
+        {
+            <div class="alert alert-success mt-3" role="alert">
+                @SuccessMessage
+            </div>
+        }
+
+        @if (ErrorMessage != null)
+        {
+            <div class="alert alert-danger mt-3" role="alert">
+                @ErrorMessage
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private CreateTaskDto NewTask = new();
+    private bool IsSubmitting = false;
+    private string? SuccessMessage;
+    private string? ErrorMessage;
+    private bool IsTitleInvalid = false;
+
+    [Parameter]
+    public EventCallback OnTaskCreated { get; set; }
+
+    private async Task HandleSubmit()
+    {
+        IsSubmitting = true;
+        SuccessMessage = null;
+        ErrorMessage = null;
+        IsTitleInvalid = false;
+        StateHasChanged();
+
+        try
+        {
+            // Validación manual adicional
+            if (string.IsNullOrWhiteSpace(NewTask.Title))
+            {
+                IsTitleInvalid = true;
+                ErrorMessage = "El título es obligatorio.";
+                IsSubmitting = false;
+                StateHasChanged();
+                return;
+            }
+
+            if (NewTask.Title.Length > 200)
+            {
+                IsTitleInvalid = true;
+                ErrorMessage = "El título no puede exceder 200 caracteres.";
+                IsSubmitting = false;
+                StateHasChanged();
+                return;
+            }
+
+            await TaskService.CreateTaskAsync(NewTask);
+            SuccessMessage = "Tarea creada exitosamente!";
+            NewTask = new CreateTaskDto();
+            
+            await OnTaskCreated.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al crear tarea");
+            ErrorMessage = "Error al crear la tarea. Por favor, intenta de nuevo.";
+        }
+        finally
+        {
+            IsSubmitting = false;
+            StateHasChanged();
+            
+            // Limpiar mensaje de éxito después de 3 segundos
+            if (SuccessMessage != null)
+            {
+                await Task.Delay(3000);
+                SuccessMessage = null;
+                StateHasChanged();
+            }
+        }
+    }
+}

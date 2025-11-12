@@ -1,0 +1,128 @@
+﻿@using TaskManager.Core.DTOs
+@inject ITaskService TaskService
+@inject ILogger<TaskItem> Logger
+
+<div class="card h-100 @(Task.IsCompleted ? "border-success" : "border-primary")">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <h5 class="card-title @(Task.IsCompleted ? "text-decoration-line-through text-muted" : "")">
+                @Task.Title
+            </h5>
+            @if (Task.IsCompleted)
+            {
+                <span class="badge bg-success">Completada</span>
+            }
+            else
+            {
+                <span class="badge bg-warning text-dark">Pendiente</span>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(Task.Description))
+        {
+            <p class="card-text text-muted">@Task.Description</p>
+        }
+
+        <small class="text-muted d-block mb-3">
+            Creada: @Task.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+            @if (Task.CompletedAt.HasValue)
+            {
+            <br />
+            Completada: @Task.CompletedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                        }
+        </small>
+
+        <div class="btn-group w-100" role="group">
+            @if (!Task.IsCompleted)
+            {
+                <button class="btn btn-success btn-sm"
+                        @onclick="CompleteTask"
+                        disabled="@IsProcessing">
+                    @if (IsProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Completar
+                </button>
+            }
+            <button class="btn btn-danger btn-sm"
+                    @onclick="DeleteTask"
+                    disabled="@IsProcessing">
+                @if (IsProcessing)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Eliminar
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public TaskDto Task { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback OnTaskUpdated { get; set; }
+
+    [Parameter]
+    public EventCallback OnTaskDeleted { get; set; }
+
+    private bool IsProcessing = false;
+
+    private async Task CompleteTask()
+    {
+        IsProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await TaskService.CompleteTaskAsync(Task.Id);
+            if (result != null)
+            {
+                await OnTaskUpdated.InvokeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al completar tarea {TaskId}", Task.Id);
+        }
+        finally
+        {
+            IsProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteTask()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"¿Estás seguro de eliminar la tarea '{Task.Title}'?"))
+        {
+            return;
+        }
+
+        IsProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            var deleted = await TaskService.DeleteTaskAsync(Task.Id);
+            if (deleted)
+            {
+                await OnTaskDeleted.InvokeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al eliminar tarea {TaskId}", Task.Id);
+        }
+        finally
+        {
+            IsProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = null!;
+}

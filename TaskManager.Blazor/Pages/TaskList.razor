@@ -1,0 +1,158 @@
+﻿@using TaskManager.Core.DTOs
+@using TaskManager.Blazor.Services
+@inject ITaskService TaskService
+@inject ILogger<TaskList> Logger
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">Mis Tareas</h2>
+            
+            <!-- Filtros -->
+            <div class="btn-group mb-3" role="group">
+                <button type="button" 
+                        class="btn @(Filter == null ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => Filter = null">
+                    Todas
+                </button>
+                <button type="button" 
+                        class="btn @(Filter == false ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => Filter = false">
+                    Pendientes
+                </button>
+                <button type="button" 
+                        class="btn @(Filter == true ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => Filter = true">
+                    Completadas
+                </button>
+            </div>
+
+            <!-- Búsqueda -->
+            <div class="input-group mb-3">
+                <input type="text" 
+                       class="form-control" 
+                       placeholder="Buscar tareas..." 
+                       @bind="SearchTerm"
+                       @bind:event="oninput" />
+                <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearch">
+                    Limpiar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    @if (IsLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2">Cargando tareas...</p>
+        </div>
+    }
+    else if (ErrorMessage != null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @ErrorMessage
+        </div>
+    }
+    else if (!FilteredTasks.Any())
+    {
+        <div class="alert alert-info" role="alert">
+            No hay tareas para mostrar.
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var task in FilteredTasks)
+            {
+                <div class="col-12 col-md-6 col-lg-4 mb-3">
+                    <TaskItem Task="task" OnTaskUpdated="HandleTaskUpdated" OnTaskDeleted="HandleTaskDeleted" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<TaskDto> Tasks = new();
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+    private bool? Filter;
+    private string SearchTerm = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTasks();
+    }
+
+    private async Task LoadTasks()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            if (Filter.HasValue)
+            {
+                Tasks = (await TaskService.GetTasksByStatusAsync(Filter.Value)).ToList();
+            }
+            else
+            {
+                Tasks = (await TaskService.GetAllTasksAsync()).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al cargar tareas");
+            ErrorMessage = "Error al cargar las tareas. Por favor, intenta de nuevo.";
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private IEnumerable<TaskDto> FilteredTasks
+    {
+        get
+        {
+            var filtered = Tasks.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(SearchTerm))
+            {
+                filtered = filtered.Where(t => 
+                    t.Title.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    (t.Description != null && t.Description.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase))
+                );
+            }
+
+            return filtered;
+        }
+    }
+
+    private async Task HandleTaskUpdated()
+    {
+        await LoadTasks();
+    }
+
+    private async Task HandleTaskDeleted()
+    {
+        await LoadTasks();
+    }
+
+    private async Task ClearSearch()
+    {
+        SearchTerm = string.Empty;
+        await Task.CompletedTask;
+    }
+
+    public async Task RefreshTasks()
+    {
+        await LoadTasks();
+    }
+}
